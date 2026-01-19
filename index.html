@@ -10,74 +10,48 @@ body {
     background: #f4f6f9;
     padding: 20px;
 }
-
 h2 {
     margin-bottom: 10px;
 }
-
 input {
     padding: 8px;
     width: 260px;
     font-size: 14px;
 }
-
 button {
     padding: 8px 14px;
     font-size: 14px;
     margin-left: 5px;
     cursor: pointer;
 }
-
 .summary, table {
     background: #ffffff;
     padding: 15px;
     border-radius: 8px;
     margin-top: 15px;
 }
-
 .summary div {
     margin: 6px 0;
     font-weight: bold;
 }
-
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
 }
-
 th, td {
     padding: 8px;
     border-bottom: 1px solid #ddd;
     text-align: center;
     font-size: 13px;
 }
-
 th {
     background: #2c3e50;
     color: white;
 }
-
-.gnpa {
-    color: red;
-    font-weight: bold;
-}
-
-.non {
-    color: green;
-    font-weight: bold;
-}
-
-.manager {
-    color: #e67e22;
-    font-weight: bold;
-}
-
-#errorMsg {
-    margin-top: 10px;
-    color: red;
-    font-weight: bold;
-}
+.gnpa { color: red; font-weight: bold; }
+.non { color: green; font-weight: bold; }
+.manager { color: #e67e22; font-weight: bold; }
+#errorMsg { margin-top: 10px; color: red; font-weight: bold; }
 </style>
 </head>
 
@@ -113,32 +87,40 @@ th {
 let customers = [];
 let contracts = [];
 
-/* ================= LOAD JSON ================= */
-fetch("output.json")
-.then(res => {
-    if (!res.ok) throw new Error("JSON not found");
-    return res.json();
-})
-.then(data => {
-    customers = data.customers;
-    contracts = data.contracts;
-})
-.catch(() => {
-    document.body.innerHTML =
-        "<h3 style='color:red'>❌ output.json not loaded.<br>Use GitHub Pages or Live Server.</h3>";
-});
+/* ======================================================
+   GITHUB-SAFE JSON PATH (AUTO-DETECT REPO NAME)
+====================================================== */
+const basePath = window.location.pathname.replace(/\/index\.html$/, "");
+const jsonPath = basePath.endsWith("/")
+    ? basePath + "output.json"
+    : basePath + "/output.json";
+
+fetch(jsonPath)
+  .then(res => {
+      if (!res.ok) throw new Error("JSON not found");
+      return res.json();
+  })
+  .then(data => {
+      customers = data.customers;
+      contracts = data.contracts;
+      console.log("JSON loaded successfully:", contracts.length);
+  })
+  .catch(err => {
+      document.body.innerHTML = `
+        <h3 style="color:red">
+        ❌ output.json not loaded<br><br>
+        ✔ Ensure BOTH files are in repo root<br>
+        ✔ GitHub Pages → main / root<br>
+        ✔ URL works: <br>
+        <code>${jsonPath}</code>
+        </h3>`;
+  });
 
 /* ================= SETTLEMENT LOGIC ================= */
 function getSettlement(seasoning, balance, isLSA) {
-    if (isLSA) {
-        return "<span class='manager'>Contact Manager</span>";
-    }
+    if (isLSA) return "<span class='manager'>Contact Manager</span>";
 
-    let pct;
-    if (seasoning >= 60) pct = 0.75;
-    else if (seasoning >= 30) pct = 0.55;
-    else pct = 0.40;
-
+    let pct = seasoning >= 60 ? 0.75 : seasoning >= 30 ? 0.55 : 0.40;
     return `₹${Math.round(balance * pct).toLocaleString()} (${pct * 100}%)`;
 }
 
@@ -149,7 +131,6 @@ function searchContract() {
     document.getElementById("contractTable").style.display = "none";
 
     const input = document.getElementById("contractInput").value.trim();
-
     if (!input) {
         document.getElementById("errorMsg").innerText = "Please enter a Contract No";
         return;
@@ -201,12 +182,12 @@ function searchContract() {
     document.getElementById("contractTable").style.display = "table";
 }
 
-/* ================= ENTER KEY SUPPORT ================= */
-document.getElementById("contractInput").addEventListener("keypress", function(e) {
-    if (e.key === "Enter") searchContract();
-});
+/* ENTER KEY SUPPORT */
+document.getElementById("contractInput")
+  .addEventListener("keypress", e => {
+      if (e.key === "Enter") searchContract();
+  });
 </script>
 
 </body>
 </html>
-
