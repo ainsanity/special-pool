@@ -2,45 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Customer Contract Settlement Tool</title>
+<title>Special Pool Settlement Tool</title>
 
 <style>
-body { font-family: Arial, sans-serif; background:#f4f6f9; padding:20px; }
-h2 { margin-bottom:10px; }
-input, button { padding:8px; font-size:14px; }
-button { margin-left:6px; cursor:pointer; }
-
+body { font-family: Arial, background: #f4f6f9; padding: 20px; }
+input, button { padding: 8px; font-size: 14px; }
+button { margin-left: 6px; cursor: pointer; }
 .summary, table {
-  background:#fff;
-  padding:15px;
-  border-radius:8px;
-  margin-top:15px;
+  background: #fff; padding: 15px; border-radius: 8px; margin-top: 15px;
 }
-
-table { width:100%; border-collapse:collapse; }
-th, td {
-  padding:8px;
-  border-bottom:1px solid #ddd;
-  text-align:center;
-  font-size:13px;
-}
-th { background:#2c3e50; color:white; }
-
-.gnpa { color:red; font-weight:bold; }
-.non { color:green; font-weight:bold; }
-.manager { color:#e67e22; font-weight:bold; }
-
-#error {
-  color:red;
-  font-weight:bold;
-  margin-top:10px;
-}
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 13px;}
+th { background: #2c3e50; color: #fff; }
+.gnpa { color: red; font-weight: bold; }
+.non { color: green; font-weight: bold; }
+.manager { color: #e67e22; font-weight: bold; }
+#error { color: red; font-weight: bold; margin-top: 10px; }
 </style>
-</head>
 
+</head>
 <body>
 
-<h2>Search by Contract No</h2>
+<h2>Search Contract</h2>
 
 <input id="contractInput" placeholder="Enter Contract No">
 <button onclick="searchContract()">Search</button>
@@ -48,11 +31,11 @@ th { background:#2c3e50; color:white; }
 <div id="error"></div>
 <div class="summary" id="summary"></div>
 
-<table id="tbl" style="display:none">
+<table id="tbl" style="display:none;">
 <thead>
 <tr>
   <th>Contract No</th>
-  <th>GNPA Flag</th>
+  <th>GNPA</th>
   <th>Seasoning %</th>
   <th>Contract Balance Jan-26</th>
   <th>Settlement Offer</th>
@@ -62,37 +45,40 @@ th { background:#2c3e50; color:white; }
 </table>
 
 <script>
-// 🔴 YOUR ACTUAL RAW JSON URL
-const RAW_JSON_URL =
-  "https://raw.githubusercontent.com/ainsanity/special-pool/main/output.json";
+// 🚩 Use your RAW GitHub JSON URL here
+const DATA_URL = 
+  "https://raw.githubusercontent.com/ainsanity/special-pool/refs/heads/main/output.json";
 
 let customers = [];
 let contracts = [];
 let loaded = false;
 
-/* ================= LOAD JSON ================= */
-fetch(RAW_JSON_URL)
-  .then(res => res.json())
+/* LOAD JSON */
+fetch(DATA_URL)
+  .then(res => {
+    if (!res.ok) throw new Error("JSON not found");
+    return res.json();
+  })
   .then(data => {
     customers = data.customers;
     contracts = data.contracts;
     loaded = true;
-    console.log("Loaded contracts:", contracts.length);
+    console.log("JSON loaded:", contracts.length, "contracts");
   })
   .catch(err => {
-    document.getElementById("error").innerText =
-      "❌ Failed to load JSON. Check RAW URL.";
+    document.getElementById("error").innerText = 
+        "❌ Failed to load JSON. Check the RAW URL above.";
   });
 
-/* ================= SETTLEMENT LOGIC ================= */
+/* SETTLEMENT LOGIC */
 function settlement(seasoning, balance, lsa) {
-  if (lsa === "YES") return "Contact Manager";
-  if (seasoning >= 60) return Math.round(balance * 0.75);
-  if (seasoning >= 30) return Math.round(balance * 0.55);
-  return Math.round(balance * 0.40);
+  if (lsa === "YES") return "<span class='manager'>Contact Manager</span>";
+  if (seasoning >= 60) return `₹${Math.round(balance * 0.75).toLocaleString()}`;
+  if (seasoning >= 30) return `₹${Math.round(balance * 0.55).toLocaleString()}`;
+  return `₹${Math.round(balance * 0.40).toLocaleString()}`;
 }
 
-/* ================= SEARCH ================= */
+/* SEARCH */
 function searchContract() {
   document.getElementById("error").innerText = "";
   document.getElementById("tbl").style.display = "none";
@@ -108,8 +94,8 @@ function searchContract() {
     return;
   }
 
-  const found = contracts.find(c =>
-    String(c.contract_no).trim().toUpperCase() === input
+  const found = contracts.find(
+      c => String(c.contract_no).trim().toUpperCase() === input
   );
 
   if (!found) {
@@ -120,24 +106,26 @@ function searchContract() {
   const customer = customers.find(c => c.customer_id === found.customer_id);
   const linked = contracts.filter(c => c.customer_id === found.customer_id);
 
+  /* SHOW SUMMARY */
   document.getElementById("summary").innerHTML = `
-    <div><b>Customer:</b> ${customer.customer_name}</div>
-    <div><b>Total Contracts:</b> ${linked.length}</div>
-    <div><b>GNPA:</b> ${linked.filter(c=>c.gnpa_flag==="YES").length}</div>
-    <div><b>Non-GNPA:</b> ${linked.filter(c=>c.gnpa_flag!=="YES").length}</div>
-    <div><b>LSA:</b> ${customer.lsa_flag==="YES" ? linked.length : 0}</div>
+    <div><strong>Customer:</strong> ${customer.customer_name}</div>
+    <div><strong>Total Contracts:</strong> ${linked.length}</div>
+    <div><strong>GNPA:</strong> ${linked.filter(c => c.gnpa_flag === "YES").length}</div>
+    <div><strong>Non-GNPA:</strong> ${linked.filter(c => c.gnpa_flag !== "YES").length}</div>
+    <div><strong>LSA:</strong> ${customer.lsa_flag === "YES" ? linked.length : 0}</div>
   `;
 
+  /* CONTRACT DETAILS */
   document.getElementById("tbody").innerHTML = linked.map(c => `
     <tr>
       <td>${c.contract_no}</td>
-      <td class="${c.gnpa_flag==="YES" ? "gnpa" : "non"}">${c.gnpa_flag}</td>
+      <td class="${c.gnpa_flag==="YES"?"gnpa":"non"}">${c.gnpa_flag}</td>
       <td>${c.seasoning_pct}</td>
-      <td>${c.contract_balance_jan_26}</td>
+      <td>${c.contract_balance_jan_26.toLocaleString()}</td>
       <td>${settlement(
-        c.seasoning_pct,
-        c.contract_balance_jan_26,
-        customer.lsa_flag
+          c.seasoning_pct,
+          c.contract_balance_jan_26,
+          customer.lsa_flag
       )}</td>
     </tr>
   `).join("");
