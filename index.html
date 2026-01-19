@@ -5,25 +5,42 @@
 <title>Customer Contract Settlement Tool</title>
 
 <style>
-body { font-family: Arial; background:#f4f6f9; padding:20px }
-input, button { padding:8px; font-size:14px }
-button { margin-left:5px }
+body { font-family: Arial, sans-serif; background:#f4f6f9; padding:20px; }
+h2 { margin-bottom:10px; }
+input, button { padding:8px; font-size:14px; }
+button { margin-left:6px; cursor:pointer; }
+
 .summary, table {
-  background:#fff; padding:15px; border-radius:8px; margin-top:15px
+  background:#fff;
+  padding:15px;
+  border-radius:8px;
+  margin-top:15px;
 }
-table { width:100%; border-collapse:collapse }
-th,td { padding:8px; border:1px solid #ddd; text-align:center }
-th { background:#2c3e50; color:#fff }
-.gnpa { color:red; font-weight:bold }
-.non { color:green; font-weight:bold }
-.manager { color:#e67e22; font-weight:bold }
-#error { color:red; font-weight:bold; margin-top:10px }
+
+table { width:100%; border-collapse:collapse; }
+th, td {
+  padding:8px;
+  border-bottom:1px solid #ddd;
+  text-align:center;
+  font-size:13px;
+}
+th { background:#2c3e50; color:white; }
+
+.gnpa { color:red; font-weight:bold; }
+.non { color:green; font-weight:bold; }
+.manager { color:#e67e22; font-weight:bold; }
+
+#error {
+  color:red;
+  font-weight:bold;
+  margin-top:10px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>Search Contract</h2>
+<h2>Search by Contract No</h2>
 
 <input id="contractInput" placeholder="Enter Contract No">
 <button onclick="searchContract()">Search</button>
@@ -34,32 +51,40 @@ th { background:#2c3e50; color:#fff }
 <table id="tbl" style="display:none">
 <thead>
 <tr>
-<th>Contract No</th>
-<th>GNPA</th>
-<th>Seasoning %</th>
-<th>Balance Jan-26</th>
-<th>Settlement</th>
+  <th>Contract No</th>
+  <th>GNPA Flag</th>
+  <th>Seasoning %</th>
+  <th>Contract Balance Jan-26</th>
+  <th>Settlement Offer</th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
 
 <script>
+// 🔴 YOUR ACTUAL RAW JSON URL
+const RAW_JSON_URL =
+  "https://raw.githubusercontent.com/ainsanity/special-pool/main/output.json";
+
 let customers = [];
 let contracts = [];
-let dataLoaded = false;
+let loaded = false;
 
-/* ========== LOAD JSON ========== */
-fetch("output.json")
-  .then(r => r.json())
-  .then(d => {
-    customers = d.customers;
-    contracts = d.contracts;
-    dataLoaded = true;
+/* ================= LOAD JSON ================= */
+fetch(RAW_JSON_URL)
+  .then(res => res.json())
+  .then(data => {
+    customers = data.customers;
+    contracts = data.contracts;
+    loaded = true;
     console.log("Loaded contracts:", contracts.length);
+  })
+  .catch(err => {
+    document.getElementById("error").innerText =
+      "❌ Failed to load JSON. Check RAW URL.";
   });
 
-/* ========== SETTLEMENT ========== */
+/* ================= SETTLEMENT LOGIC ================= */
 function settlement(seasoning, balance, lsa) {
   if (lsa === "YES") return "Contact Manager";
   if (seasoning >= 60) return Math.round(balance * 0.75);
@@ -67,24 +92,24 @@ function settlement(seasoning, balance, lsa) {
   return Math.round(balance * 0.40);
 }
 
-/* ========== SEARCH ========== */
+/* ================= SEARCH ================= */
 function searchContract() {
   document.getElementById("error").innerText = "";
   document.getElementById("tbl").style.display = "none";
 
-  if (!dataLoaded) {
-    document.getElementById("error").innerText = "Data still loading. Try again.";
+  if (!loaded) {
+    document.getElementById("error").innerText = "Data still loading...";
     return;
   }
 
-  const input = document.getElementById("contractInput").value.trim();
+  const input = document.getElementById("contractInput").value.trim().toUpperCase();
   if (!input) {
-    document.getElementById("error").innerText = "Enter Contract No";
+    document.getElementById("error").innerText = "Please enter a Contract No";
     return;
   }
 
   const found = contracts.find(c =>
-    String(c.contract_no).trim().toUpperCase() === input.toUpperCase()
+    String(c.contract_no).trim().toUpperCase() === input
   );
 
   if (!found) {
@@ -92,24 +117,28 @@ function searchContract() {
     return;
   }
 
-  const customer = customers.find(x => x.customer_id === found.customer_id);
-  const linked = contracts.filter(x => x.customer_id === found.customer_id);
+  const customer = customers.find(c => c.customer_id === found.customer_id);
+  const linked = contracts.filter(c => c.customer_id === found.customer_id);
 
   document.getElementById("summary").innerHTML = `
-    <b>Customer:</b> ${customer.customer_name}<br>
-    <b>Total Contracts:</b> ${linked.length}<br>
-    <b>GNPA:</b> ${linked.filter(x=>x.gnpa_flag==="YES").length}<br>
-    <b>Non GNPA:</b> ${linked.filter(x=>x.gnpa_flag!=="YES").length}<br>
-    <b>LSA:</b> ${customer.lsa_flag==="YES" ? linked.length : 0}
+    <div><b>Customer:</b> ${customer.customer_name}</div>
+    <div><b>Total Contracts:</b> ${linked.length}</div>
+    <div><b>GNPA:</b> ${linked.filter(c=>c.gnpa_flag==="YES").length}</div>
+    <div><b>Non-GNPA:</b> ${linked.filter(c=>c.gnpa_flag!=="YES").length}</div>
+    <div><b>LSA:</b> ${customer.lsa_flag==="YES" ? linked.length : 0}</div>
   `;
 
   document.getElementById("tbody").innerHTML = linked.map(c => `
     <tr>
       <td>${c.contract_no}</td>
-      <td class="${c.gnpa_flag==="YES"?"gnpa":"non"}">${c.gnpa_flag}</td>
+      <td class="${c.gnpa_flag==="YES" ? "gnpa" : "non"}">${c.gnpa_flag}</td>
       <td>${c.seasoning_pct}</td>
       <td>${c.contract_balance_jan_26}</td>
-      <td>${settlement(c.seasoning_pct,c.contract_balance_jan_26,customer.lsa_flag)}</td>
+      <td>${settlement(
+        c.seasoning_pct,
+        c.contract_balance_jan_26,
+        customer.lsa_flag
+      )}</td>
     </tr>
   `).join("");
 
