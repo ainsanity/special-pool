@@ -5,197 +5,116 @@
 <title>Customer Contract Settlement Tool</title>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f4f6f9;
-    padding: 20px;
-}
-h2 { margin-bottom: 10px; }
-
-input {
-    padding: 8px;
-    width: 260px;
-    font-size: 14px;
-}
-button {
-    padding: 8px 14px;
-    font-size: 14px;
-    margin-left: 6px;
-    cursor: pointer;
-}
-
+body { font-family: Arial; background:#f4f6f9; padding:20px }
+input, button { padding:8px; font-size:14px }
+button { margin-left:5px }
 .summary, table {
-    background: #ffffff;
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 15px;
+  background:#fff; padding:15px; border-radius:8px; margin-top:15px
 }
-
-.summary div {
-    margin: 6px 0;
-    font-weight: bold;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-th, td {
-    padding: 8px;
-    border-bottom: 1px solid #ddd;
-    text-align: center;
-    font-size: 13px;
-}
-
-th {
-    background: #2c3e50;
-    color: white;
-}
-
-.gnpa { color: red; font-weight: bold; }
-.non { color: green; font-weight: bold; }
-.manager { color: #e67e22; font-weight: bold; }
-
-#errorMsg {
-    margin-top: 10px;
-    color: red;
-    font-weight: bold;
-}
+table { width:100%; border-collapse:collapse }
+th,td { padding:8px; border:1px solid #ddd; text-align:center }
+th { background:#2c3e50; color:#fff }
+.gnpa { color:red; font-weight:bold }
+.non { color:green; font-weight:bold }
+.manager { color:#e67e22; font-weight:bold }
+#error { color:red; font-weight:bold; margin-top:10px }
 </style>
 </head>
 
 <body>
 
-<h2>Search by Contract No</h2>
+<h2>Search Contract</h2>
 
 <input id="contractInput" placeholder="Enter Contract No">
 <button onclick="searchContract()">Search</button>
 
-<p id="errorMsg"></p>
+<div id="error"></div>
+<div class="summary" id="summary"></div>
 
-<div class="summary" id="customerSummary"></div>
-
-<table id="contractTable" style="display:none;">
+<table id="tbl" style="display:none">
 <thead>
 <tr>
-    <th>Contract No</th>
-    <th>GNPA Flag</th>
-    <th>Finance Amount</th>
-    <th>Seasoning %</th>
-    <th>OD Principal</th>
-    <th>OD Interest</th>
-    <th>Outstanding Amount</th>
-    <th>Contract Balance Jan-26</th>
-    <th>Settlement Offer</th>
+<th>Contract No</th>
+<th>GNPA</th>
+<th>Seasoning %</th>
+<th>Balance Jan-26</th>
+<th>Settlement</th>
 </tr>
 </thead>
-<tbody id="tableBody"></tbody>
+<tbody id="tbody"></tbody>
 </table>
 
 <script>
 let customers = [];
 let contracts = [];
+let dataLoaded = false;
 
-/* ================= LOAD JSON (GITHUB SAFE) ================= */
+/* ========== LOAD JSON ========== */
 fetch("output.json")
-  .then(res => {
-      if (!res.ok) throw new Error("JSON not found");
-      return res.json();
-  })
-  .then(data => {
-      customers = data.customers;
-      contracts = data.contracts;
-      console.log("JSON loaded:", contracts.length, "contracts");
-  })
-  .catch(err => {
-      document.body.innerHTML = `
-        <h3 style="color:red">
-          ❌ output.json not loaded.<br><br>
-          ✔ Ensure index.html and output.json are in repo root<br>
-          ✔ GitHub Pages is enabled (main / root)<br>
-        </h3>`;
+  .then(r => r.json())
+  .then(d => {
+    customers = d.customers;
+    contracts = d.contracts;
+    dataLoaded = true;
+    console.log("Loaded contracts:", contracts.length);
   });
 
-/* ================= SETTLEMENT LOGIC ================= */
-function getSettlement(seasoning, balance, isLSA) {
-    if (isLSA) return "<span class='manager'>Contact Manager</span>";
-
-    let pct;
-    if (seasoning >= 60) pct = 0.75;
-    else if (seasoning >= 30) pct = 0.55;
-    else pct = 0.40;
-
-    return `₹${Math.round(balance * pct).toLocaleString()} (${pct * 100}%)`;
+/* ========== SETTLEMENT ========== */
+function settlement(seasoning, balance, lsa) {
+  if (lsa === "YES") return "Contact Manager";
+  if (seasoning >= 60) return Math.round(balance * 0.75);
+  if (seasoning >= 30) return Math.round(balance * 0.55);
+  return Math.round(balance * 0.40);
 }
 
-/* ================= SEARCH ================= */
+/* ========== SEARCH ========== */
 function searchContract() {
-    document.getElementById("errorMsg").innerText = "";
-    document.getElementById("customerSummary").innerHTML = "";
-    document.getElementById("contractTable").style.display = "none";
+  document.getElementById("error").innerText = "";
+  document.getElementById("tbl").style.display = "none";
 
-    const input = document.getElementById("contractInput").value.trim().toUpperCase();
-    if (!input) {
-        document.getElementById("errorMsg").innerText = "Please enter a Contract No";
-        return;
-    }
+  if (!dataLoaded) {
+    document.getElementById("error").innerText = "Data still loading. Try again.";
+    return;
+  }
 
-    const found = contracts.find(
-        c => String(c.contract_no).trim().toUpperCase() === input
-    );
+  const input = document.getElementById("contractInput").value.trim();
+  if (!input) {
+    document.getElementById("error").innerText = "Enter Contract No";
+    return;
+  }
 
-    if (!found) {
-        document.getElementById("errorMsg").innerText = "❌ Contract not found";
-        return;
-    }
+  const found = contracts.find(c =>
+    String(c.contract_no).trim().toUpperCase() === input.toUpperCase()
+  );
 
-    const customer = customers.find(c => c.customer_id === found.customer_id);
-    const linked = contracts.filter(c => c.customer_id === found.customer_id);
+  if (!found) {
+    document.getElementById("error").innerText = "❌ Contract not found";
+    return;
+  }
 
-    const gnpaCount = linked.filter(c => c.gnpa_flag === "YES").length;
-    const nonGnpa = linked.length - gnpaCount;
-    const lsaCount = customer.lsa_flag === "YES" ? linked.length : 0;
+  const customer = customers.find(x => x.customer_id === found.customer_id);
+  const linked = contracts.filter(x => x.customer_id === found.customer_id);
 
-    document.getElementById("customerSummary").innerHTML = `
-        <div>Customer Name: ${customer.customer_name}</div>
-        <div>Total Linked Contracts: ${linked.length}</div>
-        <div>GNPA Contracts: ${gnpaCount}</div>
-        <div>Non-GNPA Contracts: ${nonGnpa}</div>
-        <div>LSA Contracts: ${lsaCount}</div>
-    `;
+  document.getElementById("summary").innerHTML = `
+    <b>Customer:</b> ${customer.customer_name}<br>
+    <b>Total Contracts:</b> ${linked.length}<br>
+    <b>GNPA:</b> ${linked.filter(x=>x.gnpa_flag==="YES").length}<br>
+    <b>Non GNPA:</b> ${linked.filter(x=>x.gnpa_flag!=="YES").length}<br>
+    <b>LSA:</b> ${customer.lsa_flag==="YES" ? linked.length : 0}
+  `;
 
-    const body = document.getElementById("tableBody");
-    body.innerHTML = "";
+  document.getElementById("tbody").innerHTML = linked.map(c => `
+    <tr>
+      <td>${c.contract_no}</td>
+      <td class="${c.gnpa_flag==="YES"?"gnpa":"non"}">${c.gnpa_flag}</td>
+      <td>${c.seasoning_pct}</td>
+      <td>${c.contract_balance_jan_26}</td>
+      <td>${settlement(c.seasoning_pct,c.contract_balance_jan_26,customer.lsa_flag)}</td>
+    </tr>
+  `).join("");
 
-    linked.forEach(c => {
-        body.innerHTML += `
-        <tr>
-            <td>${c.contract_no}</td>
-            <td class="${c.gnpa_flag === "YES" ? "gnpa" : "non"}">${c.gnpa_flag}</td>
-            <td>${Number(c.finance_amount).toLocaleString()}</td>
-            <td>${c.seasoning_pct}%</td>
-            <td>${Number(c.od_principal).toLocaleString()}</td>
-            <td>${Number(c.od_interest).toLocaleString()}</td>
-            <td>${Number(c.outstanding_amount).toLocaleString()}</td>
-            <td>${Number(c.contract_balance_jan_26).toLocaleString()}</td>
-            <td>${getSettlement(
-                c.seasoning_pct,
-                c.contract_balance_jan_26,
-                customer.lsa_flag === "YES"
-            )}</td>
-        </tr>`;
-    });
-
-    document.getElementById("contractTable").style.display = "table";
+  document.getElementById("tbl").style.display = "table";
 }
-
-/* ENTER KEY SUPPORT */
-document.getElementById("contractInput")
-  .addEventListener("keypress", e => {
-      if (e.key === "Enter") searchContract();
-  });
 </script>
 
 </body>
