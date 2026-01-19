@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Customer Contract Settlement Tool</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    padding: 20px;
+}
+h2 {
+    margin-bottom: 10px;
+}
+input {
+    padding: 8px;
+    width: 280px;
+    font-size: 14px;
+}
+.summary, table {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+.summary div {
+    margin: 6px 0;
+    font-weight: bold;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+    font-size: 13px;
+}
+th {
+    background: #2c3e50;
+    color: white;
+}
+.gnpa {
+    color: red;
+    font-weight: bold;
+}
+.non {
+    color: green;
+    font-weight: bold;
+}
+.manager {
+    color: #e67e22;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Search Contract</h2>
+<input id="contractInput" placeholder="Enter Contract No" onkeyup="searchContract()">
+
+<div class="summary" id="customerSummary"></div>
+
+<table id="contractTable" style="display:none;">
+<thead>
+<tr>
+    <th>Contract No</th>
+    <th>GNPA Flag</th>
+    <th>Finance Amount</th>
+    <th>Seasoning %</th>
+    <th>OD Principal</th>
+    <th>OD Interest</th>
+    <th>Outstanding Amount</th>
+    <th>Contract Balance Jan-26</th>
+    <th>Settlement Offer</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
+</table>
+
+<script>
+let customers = [];
+let contracts = [];
+
+/* ---------------- LOAD JSON ---------------- */
+fetch("output.json")
+.then(res => res.json())
+.then(data => {
+    customers = data.customers;
+    contracts = data.contracts;
+})
+.catch(err => alert("Failed to load JSON. Use Live Server / GitHub Pages"));
+
+/* ---------------- SETTLEMENT LOGIC ---------------- */
+function getSettlement(seasoning, balance, isLSA) {
+    if (isLSA) return '<span class="manager">Contact Manager</span>';
+
+    let pct = 0;
+    if (seasoning >= 60) pct = 0.75;
+    else if (seasoning >= 30) pct = 0.55;
+    else pct = 0.40;
+
+    return `₹${Math.round(balance * pct).toLocaleString()} (${pct * 100}%)`;
+}
+
+/* ---------------- SEARCH FUNCTION ---------------- */
+function searchContract() {
+    const input = document.getElementById("contractInput").value.trim();
+    if (!input) return;
+
+    const found = contracts.find(c => c.contract_no === input);
+    if (!found) return;
+
+    const customer = customers.find(c => c.customer_id === found.customer_id);
+    const linked = contracts.filter(c => c.customer_id === found.customer_id);
+
+    const gnpaCount = linked.filter(c => c.gnpa_flag === "YES").length;
+    const nonGnpa = linked.length - gnpaCount;
+    const lsaCount = customer.lsa_flag === "YES" ? linked.length : 0;
+
+    document.getElementById("customerSummary").innerHTML = `
+        <div>Customer Name: ${customer.customer_name}</div>
+        <div>Total Linked Contracts: ${linked.length}</div>
+        <div>GNPA Contracts: ${gnpaCount}</div>
+        <div>Non-GNPA Contracts: ${nonGnpa}</div>
+        <div>LSA Contracts: ${lsaCount}</div>
+    `;
+
+    const body = document.getElementById("tableBody");
+    body.innerHTML = "";
+
+    linked.forEach(c => {
+        body.innerHTML += `
+        <tr>
+            <td>${c.contract_no}</td>
+            <td class="${c.gnpa_flag === "YES" ? "gnpa" : "non"}">${c.gnpa_flag}</td>
+            <td>${c.finance_amount.toLocaleString()}</td>
+            <td>${c.seasoning_pct}%</td>
+            <td>${c.od_principal.toLocaleString()}</td>
+            <td>${c.od_interest.toLocaleString()}</td>
+            <td>${c.outstanding_amount.toLocaleString()}</td>
+            <td>${c.contract_balance_jan_26.toLocaleString()}</td>
+            <td>${getSettlement(c.seasoning_pct, c.contract_balance_jan_26, customer.lsa_flag === "YES")}</td>
+        </tr>`;
+    });
+
+    document.getElementById("contractTable").style.display = "table";
+}
+</script>
+
+</body>
+</html>
