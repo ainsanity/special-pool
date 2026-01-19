@@ -114,7 +114,7 @@ let customers = [];
 let contracts = [];
 
 /* ================= LOAD JSON ================= */
-fetch("./output.json")
+fetch("output.json")
 .then(res => {
     if (!res.ok) throw new Error("JSON not found");
     return res.json();
@@ -209,3 +209,4 @@ document.getElementById("contractInput").addEventListener("keypress", function(e
 
 </body>
 </html>
+
